@@ -1,4 +1,4 @@
-This Impala User Defined Aggregate Function (UDA) uses a very simple fixed size hashset to perform a distinct count on a column.  Impala does not currently allow multiple count distincts as the algorithm it employs for distinct count, while very efficient, does not lend itself to multiple counts.  This UDA was designed so that Impala users could perform mul
+This Impala User Defined Aggregate Function (UDA) uses a very simple fixed size 'hashset' (it's really just an array) to perform a distinct count on a column.  Impala does not currently allow multiple count distincts as the algorithm it employs for distinct count, while very efficient, does not lend itself to multiple counts.  This UDA was designed so that Impala users could perform mul
 
 Disclaimers:
 1. This UDA will not work if you have null characters ("\0") in your strings, it uses that character as a delimiter.
@@ -17,3 +17,10 @@ To build:
 The samples will get built to "build" directory, there is a test executable which runs some very basic tests, and an .so which you can use to install the function on the Impala cluster.
 
 
+More about how it works:
+-First the update function will go through the column inserting values into our 'hashset' and appending where there are collisions (delimited by /0)
+-When we serialize the hashset, we turn it into a delimited list (using \0) that is sorted by position in the hashset.
+-This uses a string as the intermediate type as a sort of byte array or buffer.
+-The first byte of the intermediate type is a 'magic byte' that indicates whether we're passing around a _H_ashset struct or a _D_elimited string that is ordered by the hash bucket value.
+-Since the delimeted list is ordered by hash bucket, we can do a variation on a sort-merge join between different lists in the merge function.  This is relatively efficient so long as we don't have too many collisions, where there are collisions (same hash bucket) we have to compare each value to make sure there are no duplicates.
+-Finally, we simply count the number of delimiters to know how many objects are in our final list.
