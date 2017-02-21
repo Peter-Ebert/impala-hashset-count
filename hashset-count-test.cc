@@ -25,14 +25,14 @@ using namespace std;
 
 
 bool TestHashSetCount() {
-  UdaTestHarness<IntVal, StringVal, StringVal> test(
+  UdaTestHarness<StringVal, StringVal, StringVal> test(
       DistHashSetInit300k, DistHashSetUpdate, DistHashSetMerge, DistHashSetSerialize, DistHashSetFinalize);
   test.SetIntermediateSize(32);
 
   vector<StringVal> vals;
 
   // Test empty input
-  if (!test.Execute<StringVal>(vals, IntVal::null())) {
+  if (!test.Execute<StringVal>(vals, StringVal::null())) {
     cerr << "DHS empty: " << test.GetErrorMsg() << endl;
     return false;
   }
@@ -42,23 +42,14 @@ bool TestHashSetCount() {
   vals.push_back("");
   vals.push_back("World");
   vals.push_back("Hello");
-  vals.push_back("costarring"); //collides with liquid
+  vals.push_back("costarring");
   vals.push_back("liquid");  
   
-  if (!test.Execute<StringVal>(vals, IntVal(5))) {
+  if (!test.Execute<StringVal>(vals, StringVal("5"))) {
     cerr << "DHS: " << test.GetErrorMsg() << endl;
     return false;
   }
 
-  // Test values
-  // for (int i = 0; i < 1001; ++i) {
-  //   string s = SSTR(i);
-  //   vals.push_back( StringVal( s.c_str, s.length() ) );
-  // }
-  // if (!test.Execute<StringVal>(vals, StringVal("500"))) {
-  //   cerr << "DHS: " << test.GetErrorMsg() << endl;
-  //   return false;
-  // }
   return true;
 }
 
