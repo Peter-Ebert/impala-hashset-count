@@ -18,16 +18,15 @@ To install on cluster:
 
 -Place .so file in HDFS
 
--Run the following
-CREATE AGGREGATE FUNCTION count300k(string) RETURNS INT
-LOCATION '/path/to/libhashsetcount.so'
-init_fn='DistHashSetInit300k'
-update_fn='DistHashSetUpdate'
-merge_fn='DistHashSetMerge'
-finalize_fn='DistHashSetFinalize';
+-Run the following in Impala
+> CREATE AGGREGATE FUNCTION count300k(string) RETURNS INT
+> LOCATION '/path/to/libhashsetcount.so'
+> init_fn='DistHashSetInit300k'
+> update_fn='DistHashSetUpdate'
+> merge_fn='DistHashSetMerge'
+> finalize_fn='DistHashSetFinalize';
 
-The samples will get built to "build" directory, there is a test executable which runs some very basic tests, and an .so which you can use to install the function on the Impala cluster.
-
+The UDA will get built to "build" directory, there is a test executable which runs some very basic tests locally, and an .so which you can use to install the function on the Impala cluster.
 
 More about how it works:
 -First the update function will go through the column inserting values into our 'hashset' and appending where there are collisions (delimited by /0)
