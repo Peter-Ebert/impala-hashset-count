@@ -14,6 +14,23 @@
 using namespace impala_udf;
 using namespace std;
 
+//for converting final value to string, needed for return type bug where intermediate data type must match final
+template <typename T>
+StringVal ToStringVal(FunctionContext* context, const T& val) {
+  stringstream ss;
+  ss << val;
+  string str = ss.str();
+  StringVal string_val(context, str.size());
+  memcpy(string_val.ptr, str.c_str(), str.size());
+  return string_val;
+}
+
+template <>
+StringVal ToStringVal<DoubleVal>(FunctionContext* context, const DoubleVal& val) {
+  if (val.is_null) return StringVal::null();
+  return ToStringVal(context, val.val);
+}
+
 
 //// ---------------------------------------------------------------------------
 //   HashSet Distinct Count
@@ -380,18 +397,17 @@ void DistHashSetMerge(FunctionContext* context, const StringVal& src, StringVal*
 }
 
 
-IntVal DistHashSetFinalize(FunctionContext* context, const StringVal& strvaldhs) {
+StringVal DistHashSetFinalize(FunctionContext* context, const StringVal& strvaldhs) {
   assert(!strvaldhs.is_null);
-  IntVal unique_count;
-  unique_count.is_null = false;
-  unique_count.val = 0;
-
+  int unique_count = 0;
+  StringVal result;
+  
   if (strvaldhs.ptr[0] == MAGIC_BYTE_DELIMSTR) {
     //intermediate type is delimited string
 
     //count number of seperators
-    unique_count.val = count(strvaldhs.ptr, strvaldhs.ptr + strvaldhs.len, (int) *STRING_SEPARATOR.ptr);
-    
+    unique_count = count(strvaldhs.ptr, strvaldhs.ptr + strvaldhs.len, (int) *STRING_SEPARATOR.ptr);
+    result = ToStringVal(context, unique_count);
 
     //context->Free(strvaldhs.ptr); 
   } else if (strvaldhs.ptr[0] == MAGIC_BYTE_DHS) {
@@ -407,7 +423,7 @@ IntVal DistHashSetFinalize(FunctionContext* context, const StringVal& strvaldhs)
         if (dhs->buckets[i]) {
           if (dhs->buckets[i]->ptr) {
             //increment for every separator
-            unique_count.val += count(dhs->buckets[i]->ptr, dhs->buckets[i]->ptr + dhs->buckets[i]->len, (int) *STRING_SEPARATOR.ptr);
+            unique_count += count(dhs->buckets[i]->ptr, dhs->buckets[i]->ptr + dhs->buckets[i]->len, (int) *STRING_SEPARATOR.ptr);
             //free bucket ptrs
             context->Free((uint8_t*) dhs->buckets[i]->ptr);  
           }  
@@ -418,21 +434,23 @@ IntVal DistHashSetFinalize(FunctionContext* context, const StringVal& strvaldhs)
       }
       //free buckets array
       context->Free((uint8_t*) dhs->buckets);
+      result = ToStringVal(context, unique_count);
     } else {
       //this handles an empty dhs, e.g. all nulls or 0 rows
-      unique_count = IntVal::null();
+      result = StringVal::null();
     }
     //context->Free(strvaldhs.ptr); 
-    /////Memory Freed
+    /////Bucket Memory Freed
+
     
   } else {
     context->SetError("DistHashMerge: Bad final type found.");
-    unique_count = IntVal::null();
+    result = StringVal::null();
   }
 
   //both paths lead to freeing ptr
   context->Free(strvaldhs.ptr); 
-  
-  return unique_count;
+
+  return result;
 }
 

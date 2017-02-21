@@ -19,7 +19,7 @@ To install on cluster:
 -Place .so file in HDFS
 
 -Run the following in Impala
-> CREATE AGGREGATE FUNCTION count300k(string) RETURNS INT
+> CREATE AGGREGATE FUNCTION count300k(string) RETURNS STRING
 > LOCATION '/path/to/libhashsetcount.so'
 > init_fn='DistHashSetInit300k'
 > update_fn='DistHashSetUpdate'
