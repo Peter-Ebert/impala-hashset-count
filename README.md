@@ -1,4 +1,4 @@
-This Impala User Defined Aggregate Function (UDA) uses a very simple fixed size 'hashset' (it's really just an array) to perform a distinct count on a column.  Impala does not currently allow multiple count distincts as the algorithm it employs for distinct count, while very efficient, does not lend itself to multiple counts.  This UDA was designed so that Impala users could perform mul
+This Impala User Defined Aggregate Function (UDA) uses a very simple fixed size 'hashset' (it's really just an array) to perform a distinct count on a column.  Impala does not currently allow multiple count distincts as the algorithm it employs for distinct count, while very efficient, does not lend itself to multiple counts.  This UDA was designed so that Impala users could perform multiple distinct counts at the same time, though not as efficiently or as flexibly as the built-in.
 
 Disclaimers:
 1. This UDA will not work if you have null characters ("\0") in your strings, it uses that character as a delimiter.
