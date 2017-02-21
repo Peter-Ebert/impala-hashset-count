@@ -14,6 +14,18 @@ To build:
 2. cmake .
 3. make
 
+To install on cluster:
+
+-Place .so file in HDFS
+
+-Run the following
+CREATE AGGREGATE FUNCTION count300k(string) RETURNS INT
+LOCATION '/path/to/libhashsetcount.so'
+init_fn='DistHashSetInit300k'
+update_fn='DistHashSetUpdate'
+merge_fn='DistHashSetMerge'
+finalize_fn='DistHashSetFinalize';
+
 The samples will get built to "build" directory, there is a test executable which runs some very basic tests, and an .so which you can use to install the function on the Impala cluster.
 
 
