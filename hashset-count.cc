@@ -82,6 +82,13 @@ void DistHashSetInit300k(FunctionContext* context, StringVal* strvaldhs) {
   strvaldhs->is_null = false;
   strvaldhs->len = sizeof(DistHashSet);
   strvaldhs->ptr = context->Allocate(strvaldhs->len);
+  if (!strvaldhs->ptr) {
+    //allocation failed
+    context->SetError("HashSetCount: Init memory allocation failed.");
+    strvaldhs->is_null = true;
+    strvaldhs->len = 0;
+    return;
+  }
   memset(strvaldhs->ptr, 0, strvaldhs->len);
 
   DistHashSet* dhs = reinterpret_cast<DistHashSet*>(strvaldhs->ptr);
@@ -103,6 +110,11 @@ void DistHashSetUpdate(FunctionContext* context, const StringVal& str, StringVal
   if (dhs->buckets_need_alloc) {
     //allocate memory for buckets
     dhs->buckets = (StringVal **) context->Allocate(sizeof(StringVal *) * dhs->bucket_count);
+    if (!dhs->buckets) {
+      //allocation failed
+      context->SetError("HashSetCount: Bucket array memory allocation failed.");
+      return;
+    }
     memset(dhs->buckets, 0, sizeof(StringVal *) * dhs->bucket_count);
     dhs->buckets_need_alloc = false;
   }
@@ -112,9 +124,20 @@ void DistHashSetUpdate(FunctionContext* context, const StringVal& str, StringVal
     // First entry in bucket
     // allocate bucket memory
     dhs->buckets[mybucket] = (StringVal*) context->Allocate(sizeof(StringVal));
+    if (!dhs->buckets[mybucket]) {
+      //allocation failed
+      context->SetError("HashSetCount: Bucket stringval memory allocation failed.");
+      return;
+    }
     // copy str+delimiter into bucket
     int new_len = STRING_SEPARATOR.len + str.len;
-    uint8_t* copy = context->Allocate(new_len);
+    uint8_t* copy = context->Allocate(new_len);//NULL;
+    if (!copy) {
+      //!todo!!not working
+      //allocation failed
+      context->SetError("HashSetCount: Bucket contents memory allocation failed.");
+      return;
+    }
     memcpy(copy, str.ptr, str.len);
     memcpy(copy+str.len, STRING_SEPARATOR.ptr, STRING_SEPARATOR.len);
     dhs->buckets[mybucket]->is_null = false;
@@ -148,7 +171,13 @@ void DistHashSetUpdate(FunctionContext* context, const StringVal& str, StringVal
     if (!match_found) {
       //append
       int new_len = dhs->buckets[mybucket]->len + str.len + STRING_SEPARATOR.len;
-      dhs->buckets[mybucket]->ptr = context->Reallocate(dhs->buckets[mybucket]->ptr, new_len);
+      dhs->buckets[mybucket]->ptr = context->Reallocate(dhs->buckets[mybucket]->ptr, new_len);//NULL;
+      if (!dhs->buckets[mybucket]->ptr) {
+        //allocation failed
+        //!todo!!not working
+        context->SetError("HashSetCount: Bucket contents reallocation failed.");
+        return;
+      }
       memcpy(dhs->buckets[mybucket]->ptr + dhs->buckets[mybucket]->len, str.ptr, str.len);
       //add delim
       memcpy(dhs->buckets[mybucket]->ptr + new_len - STRING_SEPARATOR.len, STRING_SEPARATOR.ptr, STRING_SEPARATOR.len);
@@ -171,7 +200,16 @@ const StringVal DistHashSetSerialize(FunctionContext* context, const StringVal& 
     temp.ptr = strvaldhs.ptr;
     temp.len = strvaldhs.len;
   } else {
+    //intermediate type is hashset
     temp.ptr = context->Allocate(sizeof(MAGIC_BYTE_DELIMSTR));
+    if (!temp.ptr) {
+      //allocation failed
+      //!todo:doesnt work mem leak
+      context->SetError("HashSetCount: Serialize allocation failed.");
+      context->Free(strvaldhs.ptr);
+      return StringVal::null();
+    }
+
     memcpy(temp.ptr, &MAGIC_BYTE_DELIMSTR, sizeof(MAGIC_BYTE_DELIMSTR));
     temp.len = sizeof(MAGIC_BYTE_DELIMSTR);
     temp.is_null = false;
@@ -187,6 +225,12 @@ const StringVal DistHashSetSerialize(FunctionContext* context, const StringVal& 
             //always append to list, seperator already added.
             int new_len = temp.len + dhs->buckets[i]->len;
             temp.ptr = context->Reallocate(temp.ptr, new_len);
+            //!todo:doesnt work mem leak
+            if (!temp.ptr) {
+              //allocation failed
+              context->SetError("HashSetCount: Serialize reallocation failed.");
+              return StringVal::null();
+            }
             memcpy(temp.ptr + temp.len, dhs->buckets[i]->ptr, dhs->buckets[i]->len);
             temp.len = new_len;
             
@@ -220,13 +264,18 @@ const StringVal DistHashSetSerialize(FunctionContext* context, const StringVal& 
 // finalize the large combined string by counting each value or /0
 void DistHashSetMerge(FunctionContext* context, const StringVal& src, StringVal* dst) {
   //if string contains only magic byte there are no values in the list, can safely return
-  if (src.len <= 1) return;
+  if (src.len <= 1 || !dst->ptr) return;
 
   if (dst->ptr[0] == MAGIC_BYTE_DHS) { //todo:move to end, less likely than other if
     //init was run for dhs, drop and set equal to current string to be merged
     //should happen once per merge
     context->Free(dst->ptr);
     uint8_t* copy = context->Allocate(src.len);
+    if (!copy) {
+      //allocation failed
+      context->SetError("HashSetCount: Merge memory allocation failed.");
+      return;
+    }
     memcpy(copy, src.ptr, src.len);
     *dst = StringVal(copy, src.len);
 
@@ -236,6 +285,11 @@ void DistHashSetMerge(FunctionContext* context, const StringVal& src, StringVal*
 
     //to avoid having to grow the buffer, set it to the max possible size (shrink at end)
     uint8_t* merge_buffer = context->Allocate(src.len + (dst->len - MAGIC_BYTE_SIZE));
+    if (!merge_buffer) {
+      //allocation failed
+      context->SetError("HashSetCount: Merge memory allocation failed.");
+      return;
+    }
     memcpy(merge_buffer, &MAGIC_BYTE_DELIMSTR, MAGIC_BYTE_SIZE);
     uint8_t* buffer_loc = merge_buffer + MAGIC_BYTE_SIZE;
 
@@ -388,17 +442,27 @@ void DistHashSetMerge(FunctionContext* context, const StringVal& src, StringVal*
     }
 
     context->Free(dst->ptr);
-    dst->ptr = context->Reallocate(merge_buffer, buffer_loc - merge_buffer);
+    dst->ptr = NULL;//context->Reallocate(merge_buffer, buffer_loc - merge_buffer);
+    if (!merge_buffer) {
+      //allocation failed
+      context->SetError("HashSetCount: Merge memory reallocation failed.");
+      return;
+    }
     dst->len = buffer_loc - merge_buffer; 
 
   } else {
-    context->SetError("DistHashSet: Undefined intermediate type (merge).");
+    context->SetError("HashSetCount: Undefined intermediate type (merge).");
   }
 }
 
 
 StringVal DistHashSetFinalize(FunctionContext* context, const StringVal& strvaldhs) {
-  assert(!strvaldhs.is_null);
+  //assert(!strvaldhs.ptr);
+  if(!strvaldhs.ptr) {
+    context->SetError("DistHashFinalize: intermediate contains null pointer.");
+    return StringVal::null();
+  }
+
   int unique_count = 0;
   StringVal result;
   
@@ -444,7 +508,7 @@ StringVal DistHashSetFinalize(FunctionContext* context, const StringVal& strvald
 
     
   } else {
-    context->SetError("DistHashMerge: Bad final type found.");
+    context->SetError("DistHashFinalize: Bad final type found.");
     result = StringVal::null();
   }
 
