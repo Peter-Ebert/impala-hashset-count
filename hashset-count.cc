@@ -131,11 +131,13 @@ void DistHashSetUpdate(FunctionContext* context, const StringVal& str, StringVal
     }
     // copy str+delimiter into bucket
     int new_len = STRING_SEPARATOR.len + str.len;
-    uint8_t* copy = context->Allocate(new_len);//NULL;
+    uint8_t* copy = context->Allocate(new_len);
     if (!copy) {
-      //!todo!!not working
       //allocation failed
       context->SetError("HashSetCount: Bucket contents memory allocation failed.");
+      dhs->buckets[mybucket]->is_null = true;
+      dhs->buckets[mybucket]->len = 0;
+      dhs->buckets[mybucket]->ptr = copy;
       return;
     }
     memcpy(copy, str.ptr, str.len);
@@ -171,11 +173,13 @@ void DistHashSetUpdate(FunctionContext* context, const StringVal& str, StringVal
     if (!match_found) {
       //append
       int new_len = dhs->buckets[mybucket]->len + str.len + STRING_SEPARATOR.len;
-      dhs->buckets[mybucket]->ptr = context->Reallocate(dhs->buckets[mybucket]->ptr, new_len);//NULL;
+      dhs->buckets[mybucket]->ptr = context->Reallocate(dhs->buckets[mybucket]->ptr, new_len);
       if (!dhs->buckets[mybucket]->ptr) {
         //allocation failed
         //!todo!!not working
         context->SetError("HashSetCount: Bucket contents reallocation failed.");
+        dhs->buckets[mybucket]->is_null = true;
+        dhs->buckets[mybucket]->len = 0;
         return;
       }
       memcpy(dhs->buckets[mybucket]->ptr + dhs->buckets[mybucket]->len, str.ptr, str.len);
@@ -273,7 +277,7 @@ void DistHashSetMerge(FunctionContext* context, const StringVal& src, StringVal*
     uint8_t* copy = context->Allocate(src.len);
     if (!copy) {
       //allocation failed
-      context->SetError("HashSetCount: Merge memory allocation failed.");
+      context->SetError("HashSetCount: Merge initial allocation failed.");
       return;
     }
     memcpy(copy, src.ptr, src.len);
@@ -287,7 +291,7 @@ void DistHashSetMerge(FunctionContext* context, const StringVal& src, StringVal*
     uint8_t* merge_buffer = context->Allocate(src.len + (dst->len - MAGIC_BYTE_SIZE));
     if (!merge_buffer) {
       //allocation failed
-      context->SetError("HashSetCount: Merge memory allocation failed.");
+      context->SetError("HashSetCount: Merge buffer memory allocation failed.");
       return;
     }
     memcpy(merge_buffer, &MAGIC_BYTE_DELIMSTR, MAGIC_BYTE_SIZE);
@@ -442,8 +446,8 @@ void DistHashSetMerge(FunctionContext* context, const StringVal& src, StringVal*
     }
 
     context->Free(dst->ptr);
-    dst->ptr = NULL;//context->Reallocate(merge_buffer, buffer_loc - merge_buffer);
-    if (!merge_buffer) {
+    dst->ptr = context->Reallocate(merge_buffer, buffer_loc - merge_buffer);
+    if (!dst->ptr) {
       //allocation failed
       context->SetError("HashSetCount: Merge memory reallocation failed.");
       return;
