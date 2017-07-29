@@ -24,7 +24,7 @@ To install on cluster:
 
 > CREATE AGGREGATE FUNCTION count300k(string) RETURNS STRING
 > LOCATION '/path/to/libhashsetcount.so'
-> init_fn='DistHashSetInit300k'
+> init_fn='DistHashSetInit'
 > update_fn='DistHashSetUpdate'
 > merge_fn='DistHashSetMerge'
 > finalize_fn='DistHashSetFinalize';

@@ -27,7 +27,7 @@ using namespace impala_udf;
 // Usage: > create aggregate function my_avg(double) returns string 
 //          location '/user/cloudera/libudasample.so' update_fn='AvgUpdate';
 //        > select cast(my_avg(col) as double) from tbl;
-void DistHashSetInit300k(FunctionContext* context, StringVal* val);
+void DistHashSetInit(FunctionContext* context, StringVal* val);
 void DistHashSetUpdate(FunctionContext* context, const StringVal& input, StringVal* val);
 void DistHashSetMerge(FunctionContext* context, const StringVal& src, StringVal* dst);
 const StringVal DistHashSetSerialize(FunctionContext* context, const StringVal& val);

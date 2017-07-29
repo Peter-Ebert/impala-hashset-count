@@ -1,10 +1,17 @@
-// Abandon hope all ye who enter here
-// code has not been cleaned up at all, TURN BACK NOW
-
-//Caveats:
-//  WILL NOT work with strings containing \0 (NULL)
-//  May not work with spill to disk, then again it may
 //
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Ensure you've read the caveats in the README.md file!!!
 
 #include "hashset-count.h"
 #include <assert.h>
@@ -38,10 +45,6 @@ StringVal ToStringVal<DoubleVal>(FunctionContext* context, const DoubleVal& val)
 
 // Hash Function
 //todo: murmur3 would be faster, but FNV is easier to implement
-// costarring collides with liquid
-// declinate collides with macallums
-// altarage collides with zinke
-// altarages collides with zinkes
 
 static const uint64_t FNV64_PRIME = 1099511628211UL;
 static const uint64_t FNV64_SEED = 14695981039346656037UL;
@@ -56,8 +59,6 @@ static uint64_t FnvHash(const void* data, int32_t bytes, uint64_t hash) {
 }
 
 //HashTable
-// static const IntVal UPDATE_BUCKETS = 200000;
-// static const IntVal FINALIZE_BUCKETS = 300000;
 //Note: seperator cannot be present in source strings (will cause bad counts)
 static const StringVal STRING_SEPARATOR((uint8_t*)"\0", 1); //"\0"
 static const uint8_t MAGIC_BYTE_DHS = 'H';
@@ -78,7 +79,7 @@ struct DistHashSet {
 
 
 // Initialize the StringVal intermediate to a zero'd DistHashSet
-void DistHashSetInit300k(FunctionContext* context, StringVal* strvaldhs) {
+void DistHashSetInit(FunctionContext* context, StringVal* strvaldhs) {
   strvaldhs->is_null = false;
   strvaldhs->len = sizeof(DistHashSet);
   strvaldhs->ptr = context->Allocate(strvaldhs->len);
@@ -175,8 +176,7 @@ void DistHashSetUpdate(FunctionContext* context, const StringVal& str, StringVal
       int new_len = dhs->buckets[mybucket]->len + str.len + STRING_SEPARATOR.len;
       dhs->buckets[mybucket]->ptr = context->Reallocate(dhs->buckets[mybucket]->ptr, new_len);
       if (!dhs->buckets[mybucket]->ptr) {
-        //allocation failed
-        //!todo!!not working
+        //!todo: ensure bucket mem unwind
         context->SetError("HashSetCount: Bucket contents reallocation failed.");
         dhs->buckets[mybucket]->is_null = true;
         dhs->buckets[mybucket]->len = 0;
@@ -208,7 +208,7 @@ const StringVal DistHashSetSerialize(FunctionContext* context, const StringVal& 
     temp.ptr = context->Allocate(sizeof(MAGIC_BYTE_DELIMSTR));
     if (!temp.ptr) {
       //allocation failed
-      //!todo:doesnt work mem leak
+      //!todo:check mem leak
       context->SetError("HashSetCount: Serialize allocation failed.");
       context->Free(strvaldhs.ptr);
       return StringVal::null();
@@ -229,7 +229,7 @@ const StringVal DistHashSetSerialize(FunctionContext* context, const StringVal& 
             //always append to list, seperator already added.
             int new_len = temp.len + dhs->buckets[i]->len;
             temp.ptr = context->Reallocate(temp.ptr, new_len);
-            //!todo:doesnt work mem leak
+            //!todo:check mem leak
             if (!temp.ptr) {
               //allocation failed
               context->SetError("HashSetCount: Serialize reallocation failed.");
@@ -270,22 +270,9 @@ void DistHashSetMerge(FunctionContext* context, const StringVal& src, StringVal*
   //if string contains only magic byte there are no values in the list, can safely return
   if (src.len <= 1 || !dst->ptr) return;
 
-  if (dst->ptr[0] == MAGIC_BYTE_DHS) { //todo:move to end, less likely than other if
-    //init was run for dhs, drop and set equal to current string to be merged
-    //should happen once per merge
-    context->Free(dst->ptr);
-    uint8_t* copy = context->Allocate(src.len);
-    if (!copy) {
-      //allocation failed
-      context->SetError("HashSetCount: Merge initial allocation failed.");
-      return;
-    }
-    memcpy(copy, src.ptr, src.len);
-    *dst = StringVal(copy, src.len);
-
-  } else if (dst->ptr[0] == MAGIC_BYTE_DELIMSTR) {
-    //note:technically if size changed [0] would error
+if (dst->ptr[0] == MAGIC_BYTE_DELIMSTR) {
     //merge delimited strings
+    //note:technically if size changed [0] would error
 
     //to avoid having to grow the buffer, set it to the max possible size (shrink at end)
     uint8_t* merge_buffer = context->Allocate(src.len + (dst->len - MAGIC_BYTE_SIZE));
@@ -453,6 +440,20 @@ void DistHashSetMerge(FunctionContext* context, const StringVal& src, StringVal*
       return;
     }
     dst->len = buffer_loc - merge_buffer; 
+
+  } else if (dst->ptr[0] == MAGIC_BYTE_DHS) { //todo:move to end, less likely than other if
+    //init was run for dhs, drop and set equal to current string to be merged
+    //should happen once per merge
+
+    context->Free(dst->ptr);
+    uint8_t* copy = context->Allocate(src.len);
+    if (!copy) {
+      //allocation failed
+      context->SetError("HashSetCount: Merge initial allocation failed.");
+      return;
+    }
+    memcpy(copy, src.ptr, src.len);
+    *dst = StringVal(copy, src.len);
 
   } else {
     context->SetError("HashSetCount: Undefined intermediate type (merge).");
