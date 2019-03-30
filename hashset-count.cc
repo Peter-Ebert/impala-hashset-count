@@ -192,7 +192,7 @@ void DistHashSetUpdate(FunctionContext* context, const StringVal& str, StringVal
 }
 
 
-const StringVal DistHashSetSerialize(FunctionContext* context, const StringVal& strvaldhs) {
+StringVal DistHashSetSerialize(FunctionContext* context, const StringVal& strvaldhs) {
   //ensure this is a disthashset
   //assert(strvaldhs.len == sizeof(DistHashSet));
   StringVal temp;
