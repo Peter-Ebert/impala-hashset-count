@@ -21,7 +21,7 @@ set(EXECUTABLE_OUTPUT_PATH "build")
 
 find_program(CLANG_EXECUTABLE clang++)
 
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g3 -ggdb3")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g3 -ggdb3 -O3")
 
 # Function to generate rule to cross compile a source file to an IR module.
 # This should be called with the .cc src file and it will generate a
