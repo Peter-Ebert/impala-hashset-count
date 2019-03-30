@@ -2,7 +2,7 @@ This Impala User Defined Aggregate Function (UDA) uses a very simple fixed size 
 
 
 ### If using udf-devel CDH 5.9 or older
-The data types for the udf function context has changed between these versions, to make it work you need to add the "const" before the function definition in hashset-count.cc and hashset-count.h as seen in this commit https://github.com/Peter-Ebert/impala-hashset-count/commit/05eeb4f8d0d7b9a28c042799cc7208d910b409f7
+For older versions of the udf-devel you will need to reverse the commit: https://github.com/Peter-Ebert/impala-hashset-count/commit/05eeb4f8d0d7b9a28c042799cc7208d910b409f7 The data types for the udf serialize function changed between these versions, adding "const" before the function definition in hashset-count.cc and hashset-count.h will fix that.
 
 #### Disclaimers:
 
