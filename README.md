@@ -1,8 +1,8 @@
 This Impala User Defined Aggregate Function (UDA) uses a very simple fixed size 'hashset' (it's really just an array) to perform a distinct count on a column.  Impala does not currently allow multiple count distincts as the algorithm it employs for distinct count, while very efficient, does not lend itself to multiple counts.  This UDA was designed so that Impala users could perform multiple distinct counts at the same time, though not as efficiently or as flexibly as the built-in.  It will work best for distinct counts (cardinality) near the bucket size (300k default here), and it likely wont perform too well with very high counts as the final aggregation would be doing a large amount of work.
 
 
-### If using udf-devel greater than CDH 5.9
-The data types for the udf function context has changed between these versions, to make it work you need to remove the "const" before the function definition in hashset-count.cc and hashset-count.h
+### If using udf-devel CDH 5.9 or older
+The data types for the udf function context has changed between these versions, to make it work you need to add the "const" before the function definition in hashset-count.cc and hashset-count.h as seen in this commit https://github.com/Peter-Ebert/impala-hashset-count/commit/05eeb4f8d0d7b9a28c042799cc7208d910b409f7
 
 #### Disclaimers:
 
